@@ -242,6 +242,39 @@ Ejemplo de `config.json` con valores personalizados:
 
 > En Docker, `config.json` se monta como volumen de solo lectura, por lo que se puede editar sin reconstruir la imagen.
 
+---
+
+### Notas sobre el build de Docker
+
+#### 1. Ruta del build de Vite
+
+Vite está configurado con `outDir: '../backend/static'`. En el `Dockerfile`, el stage `frontend` construye desde `/build/frontend`, por lo que el output queda en `/build/backend/static/`. El stage `python` debe copiar desde esa ruta:
+
+```dockerfile
+COPY --from=frontend /build/backend/static/ ./backend/static/
+```
+
+#### 2. Flask resuelve `static_folder` relativo al módulo
+
+Flask resuelve `static_folder="static"` de forma relativa a `root_path` — el directorio donde está `app.py` (`backend/`). Por eso el `Dockerfile` debe copiar el build a `./backend/static/` y no a `./static/`.
+
+#### 3. Rutas catch-all para SPA
+
+Al usar `static_url_path=""` en Flask se genera un conflicto entre la ruta estática y las rutas explícitas de la aplicación. La solución es usar una ruta catch-all con `send_from_directory` para servir assets y `send_static_file("index.html")` como fallback:
+
+```python
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def catch_all(path):
+    if path.startswith("api/"):
+        return jsonify({"error": "Not found"}), 404
+    if path:
+        full_path = os.path.join(app.static_folder, path)
+        if os.path.isfile(full_path):
+            return send_from_directory(app.static_folder, path)
+    return app.send_static_file("index.html")
+```
+
 ### Modo claro / oscuro
 
 - Toggle con iconos de sol/luna en la barra de navegación
