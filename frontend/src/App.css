@@ -572,6 +572,13 @@ body {
   margin-bottom: 20px;
 }
 
+.turnstile-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  min-height: 65px;
+}
+
 .btn-primary {
   width: 100%;
   background: var(--accent-gradient);

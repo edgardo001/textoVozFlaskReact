@@ -17,24 +17,51 @@ Incluye modo **claro/oscuro**, barra de **progreso en tiempo real**, **fusión d
 
 ### Opción 1 — Docker (recomendado para servidor)
 
+> **Nota:** El `docker-compose.yml` incluye integración con **Traefik** (proxy inverso + SSL).
+> Para entornos **sin Traefik** (ej. desarrollo local), usa el override de abajo.
+
 ```bash
-# Construir imagen e iniciar contenedor
+# 1. Crear la red que Traefik espera (solo la primera vez)
+docker network create traefik-net
+
+# 2. Construir imagen e iniciar contenedor
 docker compose up -d
 
-# Ver logs
+# 3. Ver logs
 docker compose logs -f
 
-# Detener
+# 4. Detener
 docker compose down
 
-# Reconstruir tras cambios en código
+# 5. Reconstruir tras cambios en código
 docker compose up -d --build
 
-# Reconstruir tras cambios en config.json (sin rebuild)
+# 6. Reconstruir tras cambios en config.json (sin rebuild)
 docker compose restart
 ```
 
 Abrir `http://localhost:8080`.
+
+#### Sin Traefik (desarrollo local)
+
+Crea un archivo `docker-compose.override.yml` en la raíz con este contenido:
+
+```yaml
+services:
+  app:
+    networks: []
+    labels: []
+
+networks: {}
+```
+
+Luego ejecuta los mismos comandos de arriba. Docker combinará ambos archivos automáticamente.
+
+O alternativamente, usa el comando directo sin compose:
+
+```bash
+docker build -t textovoz . && docker run -d -p 8080:8080 -v ./config.json:/app/config.json:ro textovoz
+```
 
 El archivo `config.json` se monta como volumen de solo lectura,  
 por lo que puedes editarlo y reiniciar el contenedor sin reconstruir la imagen.
@@ -183,14 +210,16 @@ Valor por defecto: **5 MB** (5242880 bytes).
 Todas las opciones se definen en **`config.json`** en la raíz del proyecto.  
 Las variables de entorno tienen prioridad sobre el archivo.
 
-| Campo                 | Default                     | Descripción                              |
-|-----------------------|-----------------------------|------------------------------------------|
-| `port`                | `8080`                      | Puerto del servidor Flask                |
-| `max_file_size`       | `5242880` (5 MB)            | Tamaño máximo de archivo en bytes        |
-| `max_chars_per_chunk` | `2500`                      | Caracteres por segmento (Gemini TTS)     |
-| `gemini_model`        | `gemini-3.1-flash-tts-preview` | Modelo de Gemini para TTS             |
-| `gemini_voice`        | `Kore`                      | Voz de Gemini (Kore, Puck, etc.)         |
-| `rate_limit`          | `10 per minute`             | Límite de solicitudes por IP             |
+| Campo                   | Default                     | Descripción                              |
+|-------------------------|-----------------------------|------------------------------------------|
+| `port`                  | `8080`                      | Puerto del servidor Flask                |
+| `max_file_size`         | `5242880` (5 MB)            | Tamaño máximo de archivo en bytes        |
+| `max_chars_per_chunk`   | `2500`                      | Caracteres por segmento (Gemini TTS)     |
+| `gemini_model`          | `gemini-3.1-flash-tts-preview` | Modelo de Gemini para TTS             |
+| `gemini_voice`          | `Kore`                      | Voz de Gemini (Kore, Puck, etc.)         |
+| `rate_limit`            | `10 per minute`             | Límite de solicitudes por IP             |
+| `turnstile_site_key`    | `""`                        | Site key de Cloudflare Turnstile         |
+| `turnstile_secret_key`  | `""`                        | Secret key de Cloudflare Turnstile       |
 
 Ejemplo de `config.json` con valores personalizados:
 
@@ -201,9 +230,13 @@ Ejemplo de `config.json` con valores personalizados:
   "max_chars_per_chunk": 3000,
   "gemini_model": "gemini-3.1-flash-tts-preview",
   "gemini_voice": "Puck",
-  "rate_limit": "20 per minute"
+  "rate_limit": "20 per minute",
+  "turnstile_site_key": "0x4AAAA...",
+  "turnstile_secret_key": "0x4AAAA..."
 }
 ```
+
+> **Cloudflare Turnstile:** Para obtener tus keys, ve a [dash.cloudflare.com](https://dash.cloudflare.com/) → cuenta → **Turnstile** → **Add Site**. Ingresa tu dominio, selecciona "Invisible" o "Non-interactive", y copia el **Site Key** y **Secret Key** a `config.json`. Si están vacíos, la verificación se omite automáticamente.
 
 > El rate limit usa formato [`flask-limiter`](https://flask-limiter.readthedocs.io/). Ejemplos: `"5 per minute"`, `"100 per hour"`, `"1 per second"`.
 
@@ -222,15 +255,17 @@ Ejemplo de `config.json` con valores personalizados:
 
 Tienen prioridad sobre `config.json`.
 
-| Variable              | Default       | Descripción                              |
-|-----------------------|---------------|------------------------------------------|
-| `PORT`                | `8080`        | Puerto del servidor Flask                |
-| `MAX_FILE_SIZE`       | `5242880`     | Tamaño máximo de archivo en bytes        |
-| `MAX_CHARS_PER_CHUNK` | `2500`        | Caracteres por segmento (Gemini TTS)     |
-| `GEMINI_MODEL`        | `gemini-3.1-flash-tts-preview` | Modelo de Gemini para TTS     |
-| `GEMINI_VOICE`        | `Kore`        | Voz de Gemini                             |
-| `RATE_LIMIT`          | `10 per minute` | Límite de solicitudes por IP            |
-| `CONFIG_PATH`         | `config.json`    | Ruta al archivo de configuración       |
+| Variable                 | Default       | Descripción                              |
+|--------------------------|---------------|------------------------------------------|
+| `PORT`                   | `8080`        | Puerto del servidor Flask                |
+| `MAX_FILE_SIZE`          | `5242880`     | Tamaño máximo de archivo en bytes        |
+| `MAX_CHARS_PER_CHUNK`    | `2500`        | Caracteres por segmento (Gemini TTS)     |
+| `GEMINI_MODEL`           | `gemini-3.1-flash-tts-preview` | Modelo de Gemini para TTS     |
+| `GEMINI_VOICE`           | `Kore`        | Voz de Gemini                             |
+| `RATE_LIMIT`             | `10 per minute` | Límite de solicitudes por IP            |
+| `CONFIG_PATH`            | `config.json`    | Ruta al archivo de configuración       |
+| `TURNSTILE_SITE_KEY`     | `""`          | Site key de Cloudflare Turnstile         |
+| `TURNSTILE_SECRET_KEY`   | `""`          | Secret key de Cloudflare Turnstile       |
 
 ---
 

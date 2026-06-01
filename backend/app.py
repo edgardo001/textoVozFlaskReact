@@ -4,6 +4,8 @@ import uuid
 import base64
 import tempfile
 import threading
+from urllib.request import Request, urlopen
+from urllib.parse import urlencode
 
 from flask import Flask, request, send_file, jsonify, Response
 from flask_cors import CORS
@@ -35,6 +37,12 @@ CONFIG = {
     ),
     "gemini_voice": os.getenv("GEMINI_VOICE", _config.get("gemini_voice", "Kore")),
     "rate_limit": os.getenv("RATE_LIMIT", _config.get("rate_limit", "10 per minute")),
+    "turnstile_site_key": os.getenv(
+        "TURNSTILE_SITE_KEY", _config.get("turnstile_site_key", "")
+    ),
+    "turnstile_secret_key": os.getenv(
+        "TURNSTILE_SECRET_KEY", _config.get("turnstile_secret_key", "")
+    ),
 }
 
 limiter = Limiter(
@@ -208,6 +216,21 @@ def _split_text(text, max_chars=None):
     return parts
 
 
+def _verify_turnstile(token):
+    secret = CONFIG["turnstile_secret_key"]
+    if not secret:
+        return True
+    try:
+        data = urlencode({"secret": secret, "response": token}).encode()
+        req = Request(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify", data=data
+        )
+        resp = json.loads(urlopen(req).read())
+        return resp.get("success", False)
+    except Exception:
+        return False
+
+
 @app.route("/api/tts", methods=["POST"])
 def tts_start():
     data = request.get_json()
@@ -215,6 +238,12 @@ def tts_start():
     engine = data.get("engine", "gtts")
     api_key = data.get("api_key", "")
     melody_base64 = data.get("melody_base64", "")
+    turnstile_token = data.get("turnstile_token", "")
+
+    if CONFIG["turnstile_secret_key"] and not _verify_turnstile(turnstile_token):
+        return jsonify(
+            {"error": "Verificación de seguridad fallida. Intenta de nuevo."}
+        ), 403
 
     if not text:
         return jsonify({"error": "No se proporcionó texto"}), 400
@@ -300,6 +329,7 @@ def config():
             "gemini_model": CONFIG["gemini_model"],
             "gemini_voice": CONFIG["gemini_voice"],
             "rate_limit": CONFIG["rate_limit"],
+            "turnstile_site_key": CONFIG["turnstile_site_key"],
         }
     )
 

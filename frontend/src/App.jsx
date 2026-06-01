@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
 
+const TURNSTILE_CALLBACKS = {}
+
 function App() {
   const [text, setText] = useState('')
   const [fileName, setFileName] = useState('')
@@ -17,8 +19,11 @@ function App() {
   )
   const [melodyName, setMelodyName] = useState('')
   const [melodyBase64, setMelodyBase64] = useState('')
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState('')
   const fileInputRef = useRef(null)
   const melodyInputRef = useRef(null)
+  const turnstileRef = useRef(null)
   const pollingRef = useRef(null)
 
   useEffect(() => {
@@ -31,6 +36,7 @@ function App() {
       .then(r => r.json())
       .then(cfg => {
         setFileSizeLimit(cfg.max_file_size)
+        setTurnstileSiteKey(cfg.turnstile_site_key || '')
         document.documentElement.style.setProperty('--max-chars', cfg.max_chars_per_chunk)
       })
       .catch(() => {})
@@ -41,6 +47,25 @@ function App() {
       if (pollingRef.current) clearInterval(pollingRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (!turnstileSiteKey || !turnstileRef.current) return
+    const id = 'turnstile-' + Math.random().toString(36).slice(2)
+    turnstileRef.current.id = id
+    const cb = (token) => setTurnstileToken(token)
+    TURNSTILE_CALLBACKS[id] = cb
+    window.turnstile.render('#' + id, {
+      sitekey: turnstileSiteKey,
+      callback: cb,
+      'expired-callback': () => setTurnstileToken(''),
+      'error-callback': () => setTurnstileToken(''),
+    })
+    return () => {
+      delete TURNSTILE_CALLBACKS[id]
+      const el = document.getElementById(id)
+      if (el && window.turnstile) window.turnstile.remove(el)
+    }
+  }, [turnstileSiteKey])
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
@@ -93,6 +118,13 @@ function App() {
     reader.readAsDataURL(file)
   }
 
+  const resetTurnstile = () => {
+    if (turnstileRef.current?.id && window.turnstile) {
+      window.turnstile.reset('#' + turnstileRef.current.id)
+    }
+    setTurnstileToken('')
+  }
+
   const clearMelody = () => {
     setMelodyName('')
     setMelodyBase64('')
@@ -108,6 +140,7 @@ function App() {
         if (data.status === 'completed') {
           clearInterval(pollingRef.current)
           pollingRef.current = null
+          resetTurnstile()
           const dlRes = await fetch(`/api/tts/${taskId}/download`)
           if (!dlRes.ok) throw new Error('Error al descargar el audio')
           const blob = await dlRes.blob()
@@ -116,6 +149,7 @@ function App() {
         } else if (data.status === 'error') {
           clearInterval(pollingRef.current)
           pollingRef.current = null
+          resetTurnstile()
           setError(data.error || 'Error al generar audio')
           setLoading(false)
         }
@@ -147,7 +181,7 @@ function App() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, engine, api_key: apiKey, melody_base64: melodyBase64 || undefined }),
+        body: JSON.stringify({ text, engine, api_key: apiKey, melody_base64: melodyBase64 || undefined, turnstile_token: turnstileToken || undefined }),
       })
 
       if (!res.ok) {
@@ -158,6 +192,7 @@ function App() {
       const { task_id } = await res.json()
       pollTask(task_id)
     } catch (err) {
+      resetTurnstile()
       setError(err.message)
       setLoading(false)
     }
@@ -379,6 +414,12 @@ function App() {
                   <line x1="9" y1="9" x2="15" y2="15" />
                 </svg>
                 {error}
+              </div>
+            )}
+
+            {turnstileSiteKey && (
+              <div className="turnstile-wrap">
+                <div ref={turnstileRef} />
               </div>
             )}
 
