@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 COPY config.json .
 
-COPY --from=frontend /build/static/ ./static/
+COPY --from=frontend /build/backend/static/ ./static/
 
 EXPOSE 8080
 
