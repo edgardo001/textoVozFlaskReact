@@ -337,11 +337,12 @@ def config():
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def catch_all(path):
-    if not path or path.startswith("api/"):
+    if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
-    full_path = os.path.join(app.static_folder, path)
-    if os.path.isfile(full_path):
-        return send_from_directory(app.static_folder, path)
+    if path:
+        full_path = os.path.join(app.static_folder, path)
+        if os.path.isfile(full_path):
+            return send_from_directory(app.static_folder, path)
     return app.send_static_file("index.html")
 
 
