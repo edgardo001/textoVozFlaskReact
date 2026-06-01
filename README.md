@@ -236,7 +236,7 @@ Ejemplo de `config.json` con valores personalizados:
 }
 ```
 
-> **Cloudflare Turnstile:** Para obtener tus keys, ve a [dash.cloudflare.com](https://dash.cloudflare.com/) → cuenta → **Turnstile** → **Add Site**. Ingresa tu dominio, selecciona "Invisible" o "Non-interactive", y copia el **Site Key** y **Secret Key** a `config.json`. Si están vacíos, la verificación se omite automáticamente.
+> **Cloudflare Turnstile:** Para obtener tus keys, ve a [dash.cloudflare.com](https://dash.cloudflare.com/) → **Cuenta** → **"Proteger y conectar"** / **"Aplicación de seguridad"** → **Turnstile** → botón **"Agregar widget"**. Ingresa tu dominio, selecciona "Invisible" o "Non-interactive", y copia el **Site Key** y **Secret Key** a `config.json`. Si están vacíos, la verificación se omite automáticamente.
 
 > El rate limit usa formato [`flask-limiter`](https://flask-limiter.readthedocs.io/). Ejemplos: `"5 per minute"`, `"100 per hour"`, `"1 per second"`.
 
