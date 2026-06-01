@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    container_name: textovoz
+    restart: unless-stopped
+    networks:
+      - traefik-net
+    environment:
+      - PORT=8080
+    volumes:
+      - ./config.json:/app/config.json:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.textovoz.entrypoints=websecure"
+      - "traefik.http.routers.textovoz.rule=Host(`textovoz.edgardovasquez.cl`)"
+      - "traefik.http.routers.textovoz.tls=true"
+      - "traefik.http.routers.textovoz.tls.certresolver=letsencrypt"
+      - "traefik.http.services.textovoz.loadbalancer.server.port=8080"
+
+networks:
+  traefik-net:
+    external: true
