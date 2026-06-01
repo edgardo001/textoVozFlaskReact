@@ -7,13 +7,13 @@ import threading
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 
-from flask import Flask, request, send_file, jsonify, Response
+from flask import Flask, request, send_file, send_from_directory, jsonify, Response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from gtts import gTTS
 
-app = Flask(__name__, static_folder="static", static_url_path="")
+app = Flask(__name__, static_folder="static")
 CORS(app)
 
 _config_path = os.getenv("CONFIG_PATH", "config.json")
@@ -334,8 +334,14 @@ def config():
     )
 
 
-@app.route("/")
-def index():
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def catch_all(path):
+    if not path or path.startswith("api/"):
+        return jsonify({"error": "Not found"}), 404
+    full_path = os.path.join(app.static_folder, path)
+    if os.path.isfile(full_path):
+        return send_from_directory(app.static_folder, path)
     return app.send_static_file("index.html")
 
 
