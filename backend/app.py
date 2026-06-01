@@ -13,7 +13,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from gtts import gTTS
 
-app = Flask(__name__, static_folder="static")
+app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
 _config_path = os.getenv("CONFIG_PATH", "config.json")
